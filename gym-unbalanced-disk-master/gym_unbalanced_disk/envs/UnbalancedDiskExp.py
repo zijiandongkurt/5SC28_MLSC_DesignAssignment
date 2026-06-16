@@ -104,7 +104,7 @@ class UnbalancedDisk_exp(gym.Env):
         reward = self.reward_fun(self)
         return obs, reward, False, False, {}
         
-    def reset(self,seed=None):
+    def reset(self,seed=None, options=None):
         theta_now = self.get_obs()[0]
         t_start = time.time()
         while time.time()-t_start<30:
@@ -253,8 +253,8 @@ class UnbalancedDisk_exp(gym.Env):
 
 class UnbalancedDisk_exp_sincos(UnbalancedDisk_exp):
     """docstring for UnbalancedDisk_exp_sincos"""
-    def __init__(self, umax=3., dt = 0.025):
-        super(UnbalancedDisk_exp_sincos, self).__init__(umax=umax, dt=dt)
+    def __init__(self, umax=3., dt = 0.025, render_mode='human'):
+        super(UnbalancedDisk_exp_sincos, self).__init__(umax=umax, dt=dt, render_mode=render_mode)
         low = [-1,-1,-40.] 
         high = [1,1,40.]
         self.observation_space = spaces.Box(low=np.array(low,dtype=np.float32),high=np.array(high,dtype=np.float32),shape=(3,))
