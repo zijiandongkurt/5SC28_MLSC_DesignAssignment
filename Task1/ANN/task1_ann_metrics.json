@@ -1,0 +1,17 @@
+{
+  "ann_simple_prediction_test": {
+    "rms_rad": 0.0037199275345161107,
+    "rms_deg": 0.213136147822279,
+    "nrms_percent": 0.7198610714632667
+  },
+  "ann_advanced_prediction_test": {
+    "rms_rad": 0.0031111611884897714,
+    "rms_deg": 0.17825640548536908,
+    "nrms_percent": 0.6020557674472294
+  },
+  "ann_advanced_simulation_internal": {
+    "rms_rad": 0.04014650977663763,
+    "rms_deg": 2.3002255723820335,
+    "nrms_percent": 7.754213200025445
+  }
+}
