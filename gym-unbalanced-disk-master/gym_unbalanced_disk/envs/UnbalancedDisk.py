@@ -173,8 +173,8 @@ class UnbalancedDisk(gym.Env):
 
 class UnbalancedDisk_sincos(UnbalancedDisk):
     """docstring for UnbalancedDisk_sincos"""
-    def __init__(self, umax=3., dt = 0.025):
-        super(UnbalancedDisk_sincos, self).__init__(umax=umax, dt=dt)
+    def __init__(self, umax=3., dt = 0.025, render_mode='human'):
+        super(UnbalancedDisk_sincos, self).__init__(umax=umax, dt=dt, render_mode=render_mode)
         low = [-1,-1,-40.] 
         high = [1,1,40.]
         self.observation_space = spaces.Box(low=np.array(low,dtype=np.float32),high=np.array(high,dtype=np.float32),shape=(3,), dtype=np.float32)
