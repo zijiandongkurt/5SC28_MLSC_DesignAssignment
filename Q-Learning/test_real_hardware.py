@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import glob
+import argparse
 from pathlib import Path
 import numpy as np
 
@@ -24,6 +25,26 @@ DT = 0.025
 MAX_STEPS = 300 # 7.5 seconds
 OMEGA_KILL_LIMIT = 60.0
 GRACE_PERIOD_SEC = 2.0
+
+def latest_sweep_batch():
+    sweep_root = CURRENT_DIR / "top5_stab_sweep_results"
+    if not sweep_root.exists():
+        return None
+    versions = sorted(
+        [int(path.name[1:]) for path in sweep_root.glob("v*") if path.is_dir() and path.name[1:].isdigit()]
+    )
+    if not versions:
+        return None
+    return sweep_root / f"v{versions[-1]}"
+
+def default_models_root():
+    sweep_batch = latest_sweep_batch()
+    if sweep_batch is not None:
+        return sweep_batch
+    return CURRENT_DIR / "top5_results"
+
+def has_loadable_model(model_dir):
+    return (model_dir / "config.json").exists() and (model_dir / "best_rbf_weights.npy").exists()
 
 def get_safe_filename(trial_dir, partial=False):
     """Ensures zero-overwrites by finding the next sequential _vX file."""
@@ -161,16 +182,30 @@ def run_episode(env, agent, feature_extractor, trial_dir, ep_num, pacing_mode):
     return partial_flag
 
 def main():
-    results_dir = CURRENT_DIR / "top5_results"
+    parser = argparse.ArgumentParser(description="Deploy saved RBF models on the real unbalanced disk setup.")
+    parser.add_argument(
+        "--models-root",
+        type=Path,
+        default=default_models_root(),
+        help="Directory containing model folders with config.json and best_rbf_weights.npy.",
+    )
+    args = parser.parse_args()
+
+    results_dir = args.models_root
     if not results_dir.exists():
-        print("Error: Could not find 'top5_results' directory.")
+        print(f"Error: Could not find models directory: {results_dir}")
         return
         
-    available_models = sorted([d for d in results_dir.iterdir() if d.is_dir()])
+    available_models = sorted([d for d in results_dir.iterdir() if d.is_dir() and has_loadable_model(d)])
+    if not available_models:
+        print(f"Error: No loadable models found in {results_dir}")
+        print("Each model folder needs config.json and best_rbf_weights.npy.")
+        return
     
     print("\n" + "="*50)
     print("   PHYSICAL HARDWARE DEPLOYMENT SUITE   ")
     print("="*50)
+    print(f"Model root: {results_dir}")
     print("Detected Models:")
     for i, m in enumerate(available_models):
         print(f"  [{i+1}] {m.name}")
@@ -184,7 +219,10 @@ def main():
     queue = []
     
     if choice == 'A':
-        idx = int(input("Which model number? (1-5): ")) - 1
+        idx = int(input(f"Which model number? (1-{len(available_models)}): ")) - 1
+        if idx < 0 or idx >= len(available_models):
+            print("Invalid model number.")
+            return
         n_eps = int(input("How many episodes?: "))
         queue = [available_models[idx]] * n_eps
     elif choice == 'B':
@@ -192,6 +230,9 @@ def main():
     elif choice == 'C':
         seq = input("Enter comma-separated model sequence (e.g. 1,1,3,5): ")
         indices = [int(x.strip()) - 1 for x in seq.split(',')]
+        if any(i < 0 or i >= len(available_models) for i in indices):
+            print("Invalid model number in sequence.")
+            return
         queue = [available_models[i] for i in indices]
     else:
         print("Invalid choice.")
@@ -203,7 +244,10 @@ def main():
     pacing_choice = input("Select pacing (1/2): ").strip()
     pacing_mode = "auto" if pacing_choice == '1' else "manual"
 
-    input("\n[!] PLAYLIST READY. Type RUN to connect to the hardware... ")
+    confirmation = input("\n[!] PLAYLIST READY. Press Enter to connect to the hardware, or type anything to cancel... ")
+    if confirmation.strip():
+        print("Cancelled hardware run.")
+        return
     
     print("\nConnecting to physical lab setup...")
     env = gym.make('unbalanced-disk-exp-v0', dt=DT, umax=3.0)

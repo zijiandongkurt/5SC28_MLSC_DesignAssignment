@@ -14,7 +14,7 @@ from reward import calculate_custom_reward
 
 if __name__ == "__main__":
     try:
-        study = optuna.load_study(study_name="rbf_swingup", storage="sqlite:///rbf_tuning.db")
+        study = optuna.load_study(study_name="rbf_swingup_balance_robust", storage="sqlite:///rbf_tuning.db")
         bp = study.best_params
         print("Loaded best parameters from database:", bp)
     except Exception as e:
@@ -42,7 +42,14 @@ if __name__ == "__main__":
             next_state, _, terminated, truncated, _ = env.step(action_val)
             done = terminated or truncated
             
-            reward = calculate_custom_reward(next_state, action_val, bp['w_energy'], bp['w_position'], bp["w_stab"])
+            reward = calculate_custom_reward(
+                next_state,
+                action_val,
+                bp['w_energy'],
+                bp['w_position'],
+                bp.get("w_balance", bp["w_stab"]),
+                bp["w_stab"],
+            )
             next_features = feature_extractor.get_features(next_state)
             
             agent.update(features, action_idx, reward, next_features, done)

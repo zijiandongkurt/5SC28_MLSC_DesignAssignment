@@ -87,7 +87,14 @@ def train_agent(bp, trial_dir, rank, trial_num, start_time, global_eps, session_
             next_state, _, terminated, truncated, _ = env.step(action_val)
             done = terminated or truncated
             
-            reward = calculate_custom_reward(next_state, action_val, bp['w_energy'], bp['w_position'], bp["w_stab"])
+            reward = calculate_custom_reward(
+                next_state,
+                action_val,
+                bp['w_energy'],
+                bp['w_position'],
+                bp.get("w_balance", bp["w_stab"]),
+                bp["w_stab"],
+            )
             next_features = feature_extractor.get_features(next_state)
             
             agent.update(features, action_idx, reward, next_features, done)
@@ -265,7 +272,7 @@ if __name__ == "__main__":
     print("Initializing Resumable Top 5 Pipeline...")
     
     try:
-        study = optuna.load_study(study_name="rbf_swingup", storage="sqlite:///rbf_tuning.db")
+        study = optuna.load_study(study_name="rbf_swingup_balance_robust", storage="sqlite:///rbf_tuning.db")
     except Exception as e:
         print("Error: Could not load rbf_tuning.db.")
         sys.exit()
