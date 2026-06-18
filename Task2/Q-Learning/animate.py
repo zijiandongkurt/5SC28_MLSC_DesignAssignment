@@ -2,6 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import sys
+from pathlib import Path
+
+CURRENT_DIR = Path(__file__).resolve().parent
 
 # ==========================================
 # GIF CONFIGURATION SETTINGS
@@ -17,7 +20,7 @@ if __name__ == "__main__":
     
     # 1. Load the pre-recorded data
     try:
-        data = np.load('last_eval_data.npy', allow_pickle=True).item()
+        data = np.load(CURRENT_DIR / 'last_eval_data.npy', allow_pickle=True).item()
         all_thetas = data['thetas']
         all_voltages = data['voltages']
     except FileNotFoundError:
@@ -112,6 +115,6 @@ if __name__ == "__main__":
         fig, update, frames=len(times), interval=frame_delay, blit=True
     )
 
-    gif_filename = 'swingup_policy.gif'
+    gif_filename = CURRENT_DIR / 'swingup_policy.gif'
     anim.save(gif_filename, writer='pillow')
     print(f"Success! Saved beautiful animation to: {gif_filename}")

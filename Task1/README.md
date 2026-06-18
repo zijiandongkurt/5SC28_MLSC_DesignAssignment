@@ -27,12 +27,20 @@ Task1/
     hidden-test-simulation-ann-submission-file.npz
     internal-simulation-ann.png
     internal-simulation-ann.npz
+  ANN2/
+    main.py
+    sweep.py
+    dataset_handler.py
+    model.py
+    trainer.py
+    results/
 ```
 
 ## Methods
 
 - `GP`: Sparse Gaussian Process NARX prediction model.
 - `ANN`: Neural-network NARX prediction and simulation model.
+- `ANN2`: Earlier NOE/GRU ANN experiments and sweep outputs.
 
 Both methods use only:
 

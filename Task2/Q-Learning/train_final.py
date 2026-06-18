@@ -1,7 +1,8 @@
 import sys
 import os
-# Fix path: Go up one level, then into gym-unbalanced-disk-master
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'gym-unbalanced-disk-master')))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+GYM_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'gym-unbalanced-disk-master'))
+sys.path.append(GYM_DIR)
 
 import gymnasium as gym
 import gym_unbalanced_disk
@@ -14,7 +15,10 @@ from reward import calculate_custom_reward
 
 if __name__ == "__main__":
     try:
-        study = optuna.load_study(study_name="rbf_swingup_balance_robust", storage="sqlite:///rbf_tuning.db")
+        study = optuna.load_study(
+            study_name="rbf_swingup_balance_robust",
+            storage=f"sqlite:///{os.path.join(BASE_DIR, 'rbf_tuning.db').replace(os.sep, '/')}",
+        )
         bp = study.best_params
         print("Loaded best parameters from database:", bp)
     except Exception as e:
@@ -61,7 +65,7 @@ if __name__ == "__main__":
         if ep % 25 == 0:
             print(f"Episode {ep}/{episodes} | Reward: {total_reward:.2f}")
 
-    np.save('best_rbf_weights.npy', agent.weights)
+    np.save(os.path.join(BASE_DIR, 'best_rbf_weights.npy'), agent.weights)
     print("Saved weights to 'best_rbf_weights.npy'")
     env.close()
 
@@ -79,5 +83,5 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid()
     plt.tight_layout()
-    plt.savefig('learning_curve.png')
+    plt.savefig(os.path.join(BASE_DIR, 'learning_curve.png'))
     plt.show()

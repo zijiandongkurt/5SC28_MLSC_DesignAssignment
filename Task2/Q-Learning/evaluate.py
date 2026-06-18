@@ -1,7 +1,8 @@
 import sys
 import os
-# Fix path: Go up one level, then into gym-unbalanced-disk-master
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'gym-unbalanced-disk-master')))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+GYM_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'gym-unbalanced-disk-master'))
+sys.path.append(GYM_DIR)
 
 import gymnasium as gym
 import gym_unbalanced_disk
@@ -16,7 +17,10 @@ np.random.seed(SEED)
 
 if __name__ == "__main__":
     try:
-        study = optuna.load_study(study_name="rbf_swingup_balance_robust", storage="sqlite:///rbf_tuning.db")
+        study = optuna.load_study(
+            study_name="rbf_swingup_balance_robust",
+            storage=f"sqlite:///{os.path.join(BASE_DIR, 'rbf_tuning.db').replace(os.sep, '/')}",
+        )
         bp = study.best_params
     except Exception as e:
         print("Could not load database. Run tune.py first!")
@@ -29,7 +33,7 @@ if __name__ == "__main__":
     agent = RBFQLearningAgent(feature_extractor.num_features, actions, bp['alpha'], bp['gamma'], 0.0, 1.0)
     
     try:
-        agent.weights = np.load('best_rbf_weights.npy')
+        agent.weights = np.load(os.path.join(BASE_DIR, 'best_rbf_weights.npy'))
         print("Loaded trained weights.")
     except Exception as e:
         print("Could not find weights. Run train_final.py first!")
@@ -66,7 +70,7 @@ if __name__ == "__main__":
     'omegas': omegas,
     'voltages': voltages
     }
-    np.save('last_eval_data.npy', data)
+    np.save(os.path.join(BASE_DIR, 'last_eval_data.npy'), data)
 
     env.close()
 
@@ -92,5 +96,5 @@ if __name__ == "__main__":
     ax2.grid()
 
     plt.tight_layout()
-    plt.savefig('evaluation_trajectory.png')
+    plt.savefig(os.path.join(BASE_DIR, 'evaluation_trajectory.png'))
     plt.show()

@@ -1,7 +1,8 @@
 import sys
 import os
-# Fix path: Go up one level, then into gym-unbalanced-disk-master
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'gym-unbalanced-disk-master')))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+GYM_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'gym-unbalanced-disk-master'))
+sys.path.append(GYM_DIR)
 
 import gymnasium as gym
 gym.logger.set_level(40)
@@ -205,7 +206,7 @@ if __name__ == "__main__":
     study = optuna.create_study(
         direction="maximize", 
         study_name="rbf_swingup_balance_robust",
-        storage="sqlite:///rbf_tuning.db", 
+        storage=f"sqlite:///{os.path.join(BASE_DIR, 'rbf_tuning.db').replace(os.sep, '/')}",
         load_if_exists=True,
         pruner=optuna.pruners.MedianPruner()
     )

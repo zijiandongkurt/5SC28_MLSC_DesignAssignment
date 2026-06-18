@@ -17,7 +17,7 @@ import gymnasium as gym
 
 # Setup paths based on your file structure
 CURRENT_DIR = Path(__file__).resolve().parent
-GYM_DIR = CURRENT_DIR.parent / "gym-unbalanced-disk-master"
+GYM_DIR = CURRENT_DIR.parent.parent / "gym-unbalanced-disk-master"
 sys.path.append(str(GYM_DIR))
 sys.path.append(str(CURRENT_DIR))
 
@@ -272,7 +272,10 @@ if __name__ == "__main__":
     print("Initializing Resumable Top 5 Pipeline...")
     
     try:
-        study = optuna.load_study(study_name="rbf_swingup_balance_robust", storage="sqlite:///rbf_tuning.db")
+        study = optuna.load_study(
+            study_name="rbf_swingup_balance_robust",
+            storage=f"sqlite:///{(CURRENT_DIR / 'rbf_tuning.db').as_posix()}",
+        )
     except Exception as e:
         print("Error: Could not load rbf_tuning.db.")
         sys.exit()
