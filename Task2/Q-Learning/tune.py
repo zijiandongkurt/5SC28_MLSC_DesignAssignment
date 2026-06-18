@@ -4,12 +4,17 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 GYM_DIR = os.path.abspath(os.path.join(BASE_DIR, '..', '..', 'gym-unbalanced-disk-master'))
 sys.path.append(GYM_DIR)
 
+# pyrefly: ignore [missing-import]
 import gymnasium as gym
-gym.logger.set_level(40)
+# pyrefly: ignore [missing-import]
+gym.logger.min_level = 40
+# pyrefly: ignore [missing-import]
 import gym_unbalanced_disk
+# pyrefly: ignore [missing-import]
 import optuna
 import time
 from datetime import datetime, timedelta
+# pyrefly: ignore [missing-import]
 import numpy as np
 
 from agent import RBFFeatureExtractor, RBFQLearningAgent
@@ -147,9 +152,9 @@ def evaluate_policy(agent, feature_extractor, eval_episodes):
 
 def objective(trial):
     # 1. Suggest Hyperparameters
-    n_bins = trial.suggest_int('n_bins', 5, 12)
-    sigma = trial.suggest_float('sigma', 0.2, 1.5)
-    alpha = trial.suggest_float('alpha', 1e-4, 5e-2, log=True)
+    n_bins = 10
+    sigma = trial.suggest_float('sigma', 0.20, 0.31)
+    alpha = trial.suggest_float('alpha', 0.010, 0.040, log=True)
     gamma = trial.suggest_float('gamma', 0.95, 0.999)
     eps_decay = trial.suggest_float('epsilon_decay', 0.98, 0.999)
     w_energy = trial.suggest_float('w_energy', 0.1, 2.0)
