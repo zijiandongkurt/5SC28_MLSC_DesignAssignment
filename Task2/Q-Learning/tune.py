@@ -207,9 +207,10 @@ def objective(trial):
 import multiprocessing
 
 def run_worker(n_trials):
+    optuna.logging.set_verbosity(optuna.logging.WARNING)
     journal_path = os.path.join(BASE_DIR, 'rbf_tuning_journal.log')
     storage = optuna.storages.JournalStorage(
-        optuna.storages.JournalFileStorage(journal_path)
+        optuna.storages.journal.JournalFileBackend(journal_path)
     )
     study = optuna.load_study(
         study_name="rbf_swingup_balance_robust",
@@ -224,7 +225,7 @@ if __name__ == "__main__":
     
     journal_path = os.path.join(BASE_DIR, 'rbf_tuning_journal.log')
     storage = optuna.storages.JournalStorage(
-        optuna.storages.JournalFileStorage(journal_path)
+        optuna.storages.journal.JournalFileBackend(journal_path)
     )
     
     study = optuna.create_study(
@@ -240,6 +241,7 @@ if __name__ == "__main__":
     trials_to_run = TOTAL_TARGET_TRIALS - completed_trials
     
     if trials_to_run > 0:
+        import tqdm
         N_WORKERS = 8
         trials_per_worker = (trials_to_run // N_WORKERS) + 1
         processes = []
@@ -248,6 +250,20 @@ if __name__ == "__main__":
             p.start()
             processes.append(p)
             
+        # Create a unified progress bar in the main process
+        with tqdm.tqdm(total=TOTAL_TARGET_TRIALS, initial=completed_trials, desc="Optimizing") as pbar:
+            while any(p.is_alive() for p in processes):
+                finished_trials = len([t for t in study.trials if t.state.name in ['COMPLETE', 'PRUNED', 'FAIL']])
+                if finished_trials > completed_trials:
+                    pbar.update(finished_trials - completed_trials)
+                    completed_trials = finished_trials
+                time.sleep(1.0)
+            
+            # Final update
+            finished_trials = len([t for t in study.trials if t.state.name in ['COMPLETE', 'PRUNED', 'FAIL']])
+            if finished_trials > completed_trials:
+                pbar.update(finished_trials - completed_trials)
+                
         for p in processes:
             p.join()
             
