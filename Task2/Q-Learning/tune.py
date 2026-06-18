@@ -208,10 +208,15 @@ if __name__ == "__main__":
     print("Starting Optimization...")
     START_TIME = time.time()
     
+    journal_path = os.path.join(BASE_DIR, 'rbf_tuning_journal.log')
+    storage = optuna.storages.JournalStorage(
+        optuna.storages.JournalFileStorage(journal_path)
+    )
+    
     study = optuna.create_study(
         direction="maximize", 
         study_name="rbf_swingup_balance_robust",
-        storage=f"sqlite:///{os.path.join(BASE_DIR, 'rbf_tuning.db').replace(os.sep, '/')}",
+        storage=storage,
         load_if_exists=True,
         pruner=optuna.pruners.MedianPruner()
     )
@@ -220,5 +225,6 @@ if __name__ == "__main__":
     completed_trials = len(study.trials)
     trials_to_run = TOTAL_TARGET_TRIALS - completed_trials
     
-    study.optimize(objective, n_trials=trials_to_run, n_jobs=4, show_progress_bar=True)
+    # Increased threads to 8 since JournalStorage handles concurrency safely
+    study.optimize(objective, n_trials=trials_to_run, n_jobs=8, show_progress_bar=True)
     print(f"Best Score: {study.best_value:.2f}")
