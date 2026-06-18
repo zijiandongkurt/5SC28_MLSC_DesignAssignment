@@ -244,7 +244,7 @@ if __name__ == "__main__":
             print(f" {i+1}. Trial {t.number:03d} | score: {t.value:.4f}")
         print("----------------------------\n")
 
-    TOTAL_TARGET_TRIALS = 100
+    TOTAL_TARGET_TRIALS = 250
     completed_trials = len(study.trials)
     trials_to_run = TOTAL_TARGET_TRIALS - completed_trials
     
