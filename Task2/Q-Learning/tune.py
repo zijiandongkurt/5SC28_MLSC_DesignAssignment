@@ -236,6 +236,14 @@ if __name__ == "__main__":
         pruner=optuna.pruners.MedianPruner()
     )
 
+    finished_trials = [t for t in study.trials if t.state.name == 'COMPLETE']
+    if finished_trials:
+        finished_trials.sort(key=lambda t: t.value, reverse=True)
+        print("\n--- Current Top 5 Trials ---")
+        for i, t in enumerate(finished_trials[:5]):
+            print(f" {i+1}. Trial {t.number:03d} | score: {t.value:.4f}")
+        print("----------------------------\n")
+
     TOTAL_TARGET_TRIALS = 100
     completed_trials = len(study.trials)
     trials_to_run = TOTAL_TARGET_TRIALS - completed_trials
@@ -252,17 +260,59 @@ if __name__ == "__main__":
             
         # Create a unified progress bar in the main process
         with tqdm.tqdm(total=TOTAL_TARGET_TRIALS, initial=completed_trials, desc="Optimizing") as pbar:
+            processed_trial_numbers = set(t.number for t in study.trials if t.state.name in ['COMPLETE', 'PRUNED', 'FAIL'])
+            
             while any(p.is_alive() for p in processes):
-                finished_trials = len([t for t in study.trials if t.state.name in ['COMPLETE', 'PRUNED', 'FAIL']])
-                if finished_trials > completed_trials:
-                    pbar.update(finished_trials - completed_trials)
-                    completed_trials = finished_trials
+                current_finished_trials = [t for t in study.trials if t.state.name in ['COMPLETE', 'PRUNED', 'FAIL']]
+                new_trials = [t for t in current_finished_trials if t.number not in processed_trial_numbers]
+                
+                if new_trials:
+                    new_trials.sort(key=lambda x: x.number)
+                    for t in new_trials:
+                        try:
+                            best_trial = study.best_trial
+                            best_str = f"Best: (Trial {best_trial.number:03d} | score: {best_trial.value:.4f})"
+                        except ValueError:
+                            best_str = "Best: (None)"
+                            
+                        if t.state.name == 'COMPLETE':
+                            score_str = f"{t.value:.4f}" if t.value is not None else "None"
+                            msg = f"Trial {t.number:03d}: {score_str} {best_str}"
+                        elif t.state.name == 'PRUNED':
+                            msg = f"Trial {t.number:03d}: PRUNED {best_str}"
+                        else:
+                            msg = f"Trial {t.number:03d}: FAIL {best_str}"
+                            
+                        pbar.write(msg)
+                        processed_trial_numbers.add(t.number)
+                        
+                    pbar.update(len(new_trials))
+                
                 time.sleep(1.0)
             
             # Final update
-            finished_trials = len([t for t in study.trials if t.state.name in ['COMPLETE', 'PRUNED', 'FAIL']])
-            if finished_trials > completed_trials:
-                pbar.update(finished_trials - completed_trials)
+            current_finished_trials = [t for t in study.trials if t.state.name in ['COMPLETE', 'PRUNED', 'FAIL']]
+            new_trials = [t for t in current_finished_trials if t.number not in processed_trial_numbers]
+            if new_trials:
+                new_trials.sort(key=lambda x: x.number)
+                for t in new_trials:
+                    try:
+                        best_trial = study.best_trial
+                        best_str = f"Best: (Trial {best_trial.number:03d} | score: {best_trial.value:.4f})"
+                    except ValueError:
+                        best_str = "Best: (None)"
+                        
+                    if t.state.name == 'COMPLETE':
+                        score_str = f"{t.value:.4f}" if t.value is not None else "None"
+                        msg = f"Trial {t.number:03d}: {score_str} {best_str}"
+                    elif t.state.name == 'PRUNED':
+                        msg = f"Trial {t.number:03d}: PRUNED {best_str}"
+                    else:
+                        msg = f"Trial {t.number:03d}: FAIL {best_str}"
+                        
+                    pbar.write(msg)
+                    processed_trial_numbers.add(t.number)
+                pbar.update(len(new_trials))
                 
         for p in processes:
             p.join()
