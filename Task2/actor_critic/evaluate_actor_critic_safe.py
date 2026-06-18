@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+import json
 from pathlib import Path
+import re
 import sys
 import time
 
@@ -81,13 +83,33 @@ def send_zero_action(env) -> None:
         print(f"Warning: failed to send zero action during shutdown: {exc}")
 
 
-def save_outputs(logs: dict[str, list[float]], out_dir: Path, prefix: str) -> None:
+def next_output_stem(out_dir: Path, prefix: str) -> str:
+    version_pattern = re.compile(rf"^{re.escape(prefix)}_v(\d+)_")
+    highest_version = 0
+    for path in out_dir.glob(f"{prefix}_v*_*"):
+        match = version_pattern.match(path.name)
+        if match:
+            highest_version = max(highest_version, int(match.group(1)))
+    return f"{prefix}_v{highest_version + 1}"
+
+
+def save_outputs(logs: dict[str, list[float]], out_dir: Path, prefix: str, metadata: dict[str, object]) -> str:
     out_dir.mkdir(parents=True, exist_ok=True)
+    output_stem = next_output_stem(out_dir, prefix)
+    logs_path = out_dir / f"{output_stem}_logs.npz"
+    metadata_path = out_dir / f"{output_stem}_metadata.json"
+    plot_path = out_dir / f"{output_stem}_plot.png"
+
+    if logs_path.exists() or metadata_path.exists() or plot_path.exists():
+        raise FileExistsError(f"Refusing to overwrite existing output files for {output_stem}")
+
     arrays = {k: np.asarray(v) for k, v in logs.items()}
-    np.savez(out_dir / f"{prefix}_logs.npz", **arrays)
+    np.savez(logs_path, **arrays)
+    with metadata_path.open("x", encoding="utf-8") as metadata_file:
+        json.dump(metadata, metadata_file, indent=2)
 
     if len(arrays["theta"]) == 0:
-        return
+        return output_stem
 
     import matplotlib
 
@@ -117,10 +139,11 @@ def save_outputs(logs: dict[str, list[float]], out_dir: Path, prefix: str) -> No
     ax[3].set_xlabel("time [s]")
     ax[3].grid(True, alpha=0.25)
 
-    fig.suptitle(f"Safe actor-critic evaluation ({prefix})")
+    fig.suptitle(f"Safe actor-critic evaluation ({output_stem})")
     fig.tight_layout()
-    fig.savefig(out_dir / f"{prefix}_plot.png", dpi=180)
+    fig.savefig(plot_path, dpi=180)
     plt.close(fig)
+    return output_stem
 
 
 def main() -> None:
@@ -138,8 +161,8 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.env == "real" and not args.no_confirm_real:
-        confirmation = input("You are about to run on the REAL setup. Type RUN_REAL to continue: ")
-        if confirmation.strip() != "RUN_REAL":
+        confirmation = input("You are about to run on the REAL setup. Press Enter to continue, or type anything to cancel: ")
+        if confirmation.strip():
             print("Cancelled real-system run.")
             return
 
@@ -194,7 +217,19 @@ def main() -> None:
         send_zero_action(env)
         env.close()
         prefix = f"safe_{args.env}"
-        save_outputs(logs, args.out_dir, prefix)
+        metadata = {
+            "environment": args.env,
+            "model": str(args.model),
+            "steps_requested": args.steps,
+            "steps_completed": len(logs["u"]),
+            "stop_reason": stop_reason,
+            "render": args.render,
+            "sleep": args.sleep,
+            "rate_limit": args.rate_limit,
+            "omega_limit": args.omega_limit,
+            "theta_abs_limit": args.theta_abs_limit,
+        }
+        output_stem = save_outputs(logs, args.out_dir, prefix, metadata)
 
     if logs["u"]:
         last_window = np.asarray(logs["top_error"][-min(200, len(logs["top_error"])) :])
@@ -207,9 +242,10 @@ def main() -> None:
         print(f"max |du|: {np.max(np.abs(np.diff([0.0] + logs['u']))):.3f} V/step")
         print(f"mean reward: {np.mean(logs['raw_reward']):.6f}")
         print(f"mean |top error| over last window: {np.mean(np.abs(last_window)):.3f} rad")
-        print(f"saved outputs in: {args.out_dir}")
+        print(f"saved outputs in: {args.out_dir} ({output_stem})")
     else:
         print(f"No data collected. Stop reason: {stop_reason}")
+        print(f"saved outputs in: {args.out_dir} ({output_stem})")
 
 
 if __name__ == "__main__":

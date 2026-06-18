@@ -37,11 +37,11 @@ class UnbalancedDisk(gym.Env):
  
 
         # change anything here (compilable with the exercise instructions)
-        self.action_space = spaces.Box(low=-umax,high=umax,shape=tuple()) #continuous
+        self.action_space = spaces.Box(low=-umax, high=umax, shape=tuple(), dtype=np.float32) #continuous
         # self.action_space = spaces.Discrete(5) #discrete
         low = [-float('inf'),-40] 
         high = [float('inf'),40]
-        self.observation_space = spaces.Box(low=np.array(low,dtype=np.float32),high=np.array(high,dtype=np.float32),shape=(2,))
+        self.observation_space = spaces.Box(low=np.array(low,dtype=np.float32),high=np.array(high,dtype=np.float32),shape=(2,), dtype=np.float32)
 
         self.reward_fun = lambda self: np.exp(-(self.th%(2*np.pi)-np.pi)**2/(2*(np.pi/7)**2)) #example reward function, change this!
         
@@ -71,16 +71,17 @@ class UnbalancedDisk(gym.Env):
         reward = self.reward_fun(self)
         return self.get_obs(), reward, False, False, {}
          
-    def reset(self,seed=None):
-        self.th = np.random.normal(loc=0,scale=0.001)
-        self.omega = np.random.normal(loc=0,scale=0.001)
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
+        self.th = self.np_random.normal(loc=0,scale=0.001)
+        self.omega = self.np_random.normal(loc=0,scale=0.001)
         self.u = 0
         return self.get_obs(), {}
 
     def get_obs(self):
-        self.th_noise = self.th + np.random.normal(loc=0,scale=0.001) #do not edit
-        self.omega_noise = self.omega + np.random.normal(loc=0,scale=0.001) #do not edit
-        return np.array([self.th_noise, self.omega_noise])
+        self.th_noise = self.th + self.np_random.normal(loc=0,scale=0.001) #do not edit
+        self.omega_noise = self.omega + self.np_random.normal(loc=0,scale=0.001) #do not edit
+        return np.array([self.th_noise, self.omega_noise], dtype=np.float32)
 
     def render(self):
         import pygame
@@ -176,25 +177,25 @@ class UnbalancedDisk_sincos(UnbalancedDisk):
         super(UnbalancedDisk_sincos, self).__init__(umax=umax, dt=dt)
         low = [-1,-1,-40.] 
         high = [1,1,40.]
-        self.observation_space = spaces.Box(low=np.array(low,dtype=np.float32),high=np.array(high,dtype=np.float32),shape=(3,))
+        self.observation_space = spaces.Box(low=np.array(low,dtype=np.float32),high=np.array(high,dtype=np.float32),shape=(3,), dtype=np.float32)
 
     def get_obs(self):
-        self.th_noise = self.th + np.random.normal(loc=0,scale=0.001) #do not edit
-        self.omega_noise = self.omega + np.random.normal(loc=0,scale=0.001) #do not edit
-        return np.array([np.sin(self.th_noise), np.cos(self.th_noise), self.omega_noise]) #change anything here
+        self.th_noise = self.th + self.np_random.normal(loc=0,scale=0.001) #do not edit
+        self.omega_noise = self.omega + self.np_random.normal(loc=0,scale=0.001) #do not edit
+        return np.array([np.sin(self.th_noise), np.cos(self.th_noise), self.omega_noise], dtype=np.float32) #change anything here
 
 if __name__ == '__main__':
     import time
     env = UnbalancedDisk(dt=0.025)
 
-    obs = env.reset()
+    obs, info = env.reset()
     Y = [obs]
     env.render()
     try:
         for i in range(100):
             time.sleep(1/24)
             u = 3#env.action_space.sample()
-            obs, reward, done, info = env.step(u)
+            obs, reward, terminated, truncated, info = env.step(u)
             Y.append(obs)
             env.render()
     finally:

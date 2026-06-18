@@ -44,10 +44,10 @@ class UnbalancedDisk_exp(gym.Env):
         self.dt = dt
  
         ### Gym things
-        self.action_space = spaces.Box(low=-umax,high=umax,shape=tuple()) # continuous
+        self.action_space = spaces.Box(low=-umax, high=umax, shape=tuple(), dtype=np.float32) # continuous
         low = [-float('inf'),-30.]
         high = [float('inf'),30.]
-        self.observation_space = spaces.Box(low=np.array(low,dtype=np.float32),high=np.array(high,dtype=np.float32),shape=(2,))
+        self.observation_space = spaces.Box(low=np.array(low,dtype=np.float32),high=np.array(high,dtype=np.float32),shape=(2,), dtype=np.float32)
 
         self.reward_fun = lambda self: np.exp(-((self.th)%(2*np.pi)-np.pi)**2/(2*(np.pi/7)**2)) #example reward function, change this!
 
@@ -104,7 +104,8 @@ class UnbalancedDisk_exp(gym.Env):
         reward = self.reward_fun(self)
         return obs, reward, False, False, {}
         
-    def reset(self,seed=None):
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
         theta_now = self.get_obs()[0]
         t_start = time.time()
         while time.time()-t_start<30:
@@ -156,7 +157,7 @@ class UnbalancedDisk_exp(gym.Env):
         self.th = position
         #obs[3]: 3 omega
         self.omega = omega#self.obs_raw[3]
-        return np.array([self.th, self.omega])
+        return np.array([self.th, self.omega], dtype=np.float32)
 
     def render(self):
         import pygame
@@ -257,9 +258,9 @@ class UnbalancedDisk_exp_sincos(UnbalancedDisk_exp):
         super(UnbalancedDisk_exp_sincos, self).__init__(umax=umax, dt=dt)
         low = [-1,-1,-40.] 
         high = [1,1,40.]
-        self.observation_space = spaces.Box(low=np.array(low,dtype=np.float32),high=np.array(high,dtype=np.float32),shape=(3,))
+        self.observation_space = spaces.Box(low=np.array(low,dtype=np.float32),high=np.array(high,dtype=np.float32),shape=(3,), dtype=np.float32)
 
     def get_obs(self):
         super(UnbalancedDisk_exp_sincos, self).get_obs()
-        return np.array([np.sin(self.th), np.cos(self.th), self.omega])
+        return np.array([np.sin(self.th), np.cos(self.th), self.omega], dtype=np.float32)
 

@@ -11,9 +11,12 @@ from torch import nn
 from dqn_common import state_features, swingup_reward
 from policy_interface import Policy
 
+import pathlib
+import platform
+if platform.system() == 'Windows':
+    pathlib.PosixPath = pathlib.WindowsPath
 
 ACTION_LIMIT = 3.0
-
 
 class Actor(nn.Module):
     def __init__(self, state_dim: int = 4, action_limit: float = ACTION_LIMIT):

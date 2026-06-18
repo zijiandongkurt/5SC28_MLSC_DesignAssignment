@@ -80,7 +80,7 @@ import gym_unbalanced_disk, time
 env = gym.make('unbalanced-disk-v0', dt=0.025, umax=3.) 
 #env = gym_unbalanced_disk.UnbalancedDisk(dt=0.025, umax=3.) #alternative
 
-obs, info = env.reset()
+obs = env.reset()
 try:
     for i in range(200):
         obs, reward, terminated, truncated, info = env.step(env.action_space.sample()) #random action
