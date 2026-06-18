@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
+import os
+import pathlib
 import random
 
 import numpy as np
@@ -86,6 +88,11 @@ def soft_update(target: nn.Module, source: nn.Module, tau: float) -> None:
 
 class ActorCriticPolicy(Policy):
     def __init__(self, model_path: str, exploration_std: float = 0.0):
+        # The checkpoint may have been saved on macOS and can contain PosixPath
+        # objects inside the stored argparse namespace. Windows cannot unpickle
+        # PosixPath by default, so map it to WindowsPath before torch.load.
+        if os.name == "nt":
+            pathlib.PosixPath = pathlib.WindowsPath
         checkpoint = torch.load(model_path, map_location="cpu")
         self.actor = Actor()
         self.actor.load_state_dict(checkpoint["actor"])
