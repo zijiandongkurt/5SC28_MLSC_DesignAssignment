@@ -204,8 +204,22 @@ def objective(trial):
     return evaluate_policy(agent, feature_extractor, eval_episodes=2)
 
 
+import multiprocessing
+
+def run_worker(n_trials):
+    journal_path = os.path.join(BASE_DIR, 'rbf_tuning_journal.log')
+    storage = optuna.storages.JournalStorage(
+        optuna.storages.JournalFileStorage(journal_path)
+    )
+    study = optuna.load_study(
+        study_name="rbf_swingup_balance_robust",
+        storage=storage,
+        pruner=optuna.pruners.MedianPruner()
+    )
+    study.optimize(objective, n_trials=n_trials, n_jobs=1)
+
 if __name__ == "__main__":
-    print("Starting Optimization...")
+    print("Starting Multi-Process Optimization...")
     START_TIME = time.time()
     
     journal_path = os.path.join(BASE_DIR, 'rbf_tuning_journal.log')
@@ -221,10 +235,20 @@ if __name__ == "__main__":
         pruner=optuna.pruners.MedianPruner()
     )
 
-    TOTAL_TARGET_TRIALS = 250
+    TOTAL_TARGET_TRIALS = 100
     completed_trials = len(study.trials)
     trials_to_run = TOTAL_TARGET_TRIALS - completed_trials
     
-    # Increased threads to 8 since JournalStorage handles concurrency safely
-    study.optimize(objective, n_trials=trials_to_run, n_jobs=8, show_progress_bar=True)
+    if trials_to_run > 0:
+        N_WORKERS = 8
+        trials_per_worker = (trials_to_run // N_WORKERS) + 1
+        processes = []
+        for i in range(N_WORKERS):
+            p = multiprocessing.Process(target=run_worker, args=(trials_per_worker,))
+            p.start()
+            processes.append(p)
+            
+        for p in processes:
+            p.join()
+            
     print(f"Best Score: {study.best_value:.2f}")
