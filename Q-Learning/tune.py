@@ -4,6 +4,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'gym-unbalanced-disk-master')))
 
 import gymnasium as gym
+gym.logger.set_level(40)
 import gym_unbalanced_disk
 import optuna
 import time
@@ -13,12 +14,9 @@ from agent import RBFFeatureExtractor, RBFQLearningAgent
 from reward import calculate_custom_reward
 
 START_TIME = None
-TRIALS_COMPLETED = 0
-TOTAL_TRIALS = 100 
 
 def objective(trial):
-    global TRIALS_COMPLETED, START_TIME
-
+    # 1. Suggest Hyperparameters
     n_bins = trial.suggest_int('n_bins', 5, 12)
     sigma = trial.suggest_float('sigma', 0.2, 1.5)
     alpha = trial.suggest_float('alpha', 1e-4, 5e-2, log=True)
@@ -26,17 +24,21 @@ def objective(trial):
     eps_decay = trial.suggest_float('epsilon_decay', 0.98, 0.999)
     w_energy = trial.suggest_float('w_energy', 0.1, 2.0)
     w_position = trial.suggest_float('w_position', 1.0, 5.0)
+    w_stab = trial.suggest_float('w_stab', 0.0, 2.0)
 
+    # 2. Setup Environment and Agent
     env = gym.make('unbalanced-disk-sincos-v0')
     
-    # Coarse for swing-up, ultra-fine for balancing
+    # The 15 ultra-fine actions for smooth control at the top
     actions = [-3.0, -2.0, -1.0, -0.5, -0.2, -0.1, -0.05, 0.0, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 3.0]
     
     feature_extractor = RBFFeatureExtractor(n_bins, sigma)
     agent = RBFQLearningAgent(feature_extractor.num_features, actions, alpha, gamma, 1.0, eps_decay)
 
+    # 3. Training Loop (Extended to 400 episodes)
     for episode in range(400):
-        state, _ = env.reset()
+        # Seed locked for deterministic noise
+        state, _ = env.reset(seed=42)
         features = feature_extractor.get_features(state)
         done = False
         episode_reward = 0
@@ -46,7 +48,7 @@ def objective(trial):
             next_state, _, terminated, truncated, _ = env.step(action_val)
             done = terminated or truncated
             
-            reward = calculate_custom_reward(next_state, action_val, w_energy, w_position)
+            reward = calculate_custom_reward(next_state, action_val, w_energy, w_position, w_stab)
             next_features = feature_extractor.get_features(next_state)
             
             agent.update(features, action_idx, reward, next_features, done)
@@ -55,51 +57,58 @@ def objective(trial):
 
         agent.decay_epsilon()
 
-        # --- THE PRUNING FIX ---
+        # 4. Pruning Check (Delayed to episode 200)
         if episode == 200:
-            trial.report(episode_reward, step=100)
+            trial.report(episode_reward, step=200)
             if trial.should_prune():
                 env.close()
-                
-                # Update the counter and print the ETA before ejecting
-                TRIALS_COMPLETED += 1
-                elapsed_time = time.time() - START_TIME
-                avg_time = elapsed_time / TRIALS_COMPLETED
-                eta_sec = avg_time * (TOTAL_TRIALS - TRIALS_COMPLETED)
-                finish_time = datetime.now() + timedelta(seconds=eta_sec)
-                
-                print(f"[Trial {TRIALS_COMPLETED}/{TOTAL_TRIALS}] PRUNED (Poor Performance) | "
-                      f"Avg: {avg_time:.1f}s | ETA: {finish_time.strftime('%H:%M:%S')}")
-                      
+                # Clean exit for Windows multiprocessing
                 raise optuna.TrialPruned()
 
+    # 5. Evaluation Loop (Pure physics score)
+    # 5. Evaluation Loop (Physics + Smoothness Score)
+    import numpy as np # Ensure this is at the top of your file
+    
     eval_episodes = 5
-    total_eval_reward = 0.0
+    total_eval_score = 0.0
+
     for _ in range(eval_episodes):
-        state, _ = env.reset()
+        state, _ = env.reset(seed=42)
         features = feature_extractor.get_features(state)
         done = False
+        
+        episode_voltages = []
+        episode_position_score = 0.0
+
         while not done:
             action_idx, action_val = agent.select_action(features, evaluate=True)
             next_state, _, terminated, truncated, _ = env.step(action_val)
             done = terminated or truncated
-            total_eval_reward += -next_state[1] # Reward proximity to top
+            
+            # Position score: +1.0 for perfectly upright
+            episode_position_score += -next_state[1] 
+            
+            # Track the exact voltage used
+            episode_voltages.append(action_val)
             features = feature_extractor.get_features(next_state)
 
+        # Calculate Total Variation (Actuator Chattering)
+        voltage_diffs = np.abs(np.diff(episode_voltages))
+        total_variation = np.sum(voltage_diffs)
+        
+        # THE SMOOTHNESS PENALTY
+        # We multiply TV by 0.5 so it doesn't completely overwhelm the position score.
+        # This means every 1V of unnecessary jitter costs the agent 0.5 points.
+        episode_final_score = episode_position_score - (0.5 * total_variation)
+        
+        total_eval_score += episode_final_score
+
     env.close()
-    mean_reward = total_eval_reward / eval_episodes
     
-    # --- SUCCESSFUL TRIAL COMPLETION ---
-    TRIALS_COMPLETED += 1
-    elapsed_time = time.time() - START_TIME
-    avg_time = elapsed_time / TRIALS_COMPLETED
-    eta_sec = avg_time * (TOTAL_TRIALS - TRIALS_COMPLETED)
-    finish_time = datetime.now() + timedelta(seconds=eta_sec)
-    
-    print(f"[Trial {TRIALS_COMPLETED}/{TOTAL_TRIALS}] SUCCESS | Score: {mean_reward:.2f} | "
-          f"Avg: {avg_time:.1f}s | ETA: {finish_time.strftime('%H:%M:%S')}")
-          
-    return mean_reward
+    # 6. Return Final Score
+    mean_score = total_eval_score / eval_episodes
+    return mean_score
+
 
 if __name__ == "__main__":
     print("Starting Optimization...")
@@ -112,6 +121,10 @@ if __name__ == "__main__":
         load_if_exists=True,
         pruner=optuna.pruners.MedianPruner()
     )
+
+    TOTAL_TARGET_TRIALS = 250
+    completed_trials = len(study.trials)
+    trials_to_run = TOTAL_TARGET_TRIALS - completed_trials
     
-    study.optimize(objective, n_trials=TOTAL_TRIALS)
+    study.optimize(objective, n_trials=trials_to_run, n_jobs=4, show_progress_bar=True)
     print(f"Best Score: {study.best_value:.2f}")

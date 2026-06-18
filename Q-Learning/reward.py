@@ -1,4 +1,4 @@
-def calculate_custom_reward(state, action, w_energy, w_position):
+def calculate_custom_reward(state, action, w_energy, w_position, w_stab):
     sin_th, cos_th, omega = state
     
     position_reward = -cos_th 
@@ -15,4 +15,4 @@ def calculate_custom_reward(state, action, w_energy, w_position):
     else:
         stab_penalty = 0.0
 
-    return (w_position * position_reward) + (w_energy * energy_penalty) - stab_penalty
+    return (w_position * position_reward) + (w_energy * energy_penalty) - (w_stab* stab_penalty)

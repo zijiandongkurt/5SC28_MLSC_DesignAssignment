@@ -61,6 +61,13 @@ if __name__ == "__main__":
         state = next_state
         step += 1
 
+    data = {
+    'thetas': thetas,
+    'omegas': omegas,
+    'voltages': voltages
+    }
+    np.save('last_eval_data.npy', data)
+
     env.close()
 
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), sharex=True)

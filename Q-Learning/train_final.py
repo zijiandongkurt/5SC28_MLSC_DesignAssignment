@@ -27,7 +27,7 @@ if __name__ == "__main__":
     feature_extractor = RBFFeatureExtractor(bp['n_bins'], bp['sigma'])
     agent = RBFQLearningAgent(feature_extractor.num_features, actions, bp['alpha'], bp['gamma'], 1.0, bp['epsilon_decay'])
 
-    episodes = 350
+    episodes = 800
     reward_history = []
 
     print("Training final agent...")
@@ -42,7 +42,7 @@ if __name__ == "__main__":
             next_state, _, terminated, truncated, _ = env.step(action_val)
             done = terminated or truncated
             
-            reward = calculate_custom_reward(next_state, action_val, bp['w_energy'], bp['w_position'])
+            reward = calculate_custom_reward(next_state, action_val, bp['w_energy'], bp['w_position'], bp["w_stab"])
             next_features = feature_extractor.get_features(next_state)
             
             agent.update(features, action_idx, reward, next_features, done)
