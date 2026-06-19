@@ -42,7 +42,7 @@ def train_agent(bp, trial_dir, rank, trial_num, is_transfer=False):
     env = gym.make('unbalanced-disk-sincos-v0')
     env = StateRandomizationWrapper(env, death_spiral_prob=0.2)
     if is_transfer:
-        env = HardwareImpairmentWrapper(env, delay_steps=2, stiction_v=0.1, bias_omega=0.965)
+        env = HardwareImpairmentWrapper(env, delay_steps=2, stiction_v=0.1, omega_bias=0.965)
     env = AdaptiveBiasWrapper(env, alpha=0.05, dt=0.025)
     feature_extractor = RBFFeatureExtractor(10, bp['sigma'])
     
