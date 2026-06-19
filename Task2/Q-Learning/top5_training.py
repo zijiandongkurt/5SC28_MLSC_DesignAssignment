@@ -300,7 +300,6 @@ if __name__ == "__main__":
     parser.add_argument('--transfer', action='store_true', help='Use transfer learning from v2 models for fine-tuning')
     args = parser.parse_args()
 
-    global EPISODES_PER_MODEL
     EPISODES_PER_MODEL = 600 if args.transfer else 1200
 
     print(f"Initializing Multiprocessed Resumable Top 5 Pipeline (Transfer Learning: {args.transfer})...\n")
