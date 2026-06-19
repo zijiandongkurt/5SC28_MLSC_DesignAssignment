@@ -37,7 +37,7 @@ EPISODES_PER_MODEL = 1200
 ACTIONS = [-3.0, -2.0, -1.0, -0.5, -0.2, -0.1, -0.05, 0.0, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 3.0]
 SEED = 42
 
-def train_agent(bp, trial_dir, rank, trial_num, is_transfer=False):
+def train_agent(bp, trial_dir, rank, trial_num, is_transfer=False, episodes_per_model=1200):
     """Trains the RBF agent with intra-episode checkpointing."""
     env = gym.make('unbalanced-disk-sincos-v0')
     env = StateRandomizationWrapper(env, death_spiral_prob=0.2)
@@ -71,10 +71,10 @@ def train_agent(bp, trial_dir, rank, trial_num, is_transfer=False):
             agent.epsilon = data['epsilon'].item()
             reward_history = data['reward_history'].tolist()
 
-    pbar = tqdm(total=EPISODES_PER_MODEL, initial=start_ep, position=rank-1, 
+    pbar = tqdm(total=episodes_per_model, initial=start_ep, position=rank-1, 
                 desc=f"Rank {rank} (Trial {trial_num:03d})", leave=True, ncols=110, bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] {postfix}")
 
-    for ep in range(start_ep, EPISODES_PER_MODEL):
+    for ep in range(start_ep, episodes_per_model):
         state, _ = env.reset(seed=SEED if ep == 0 else None)
         
         features = feature_extractor.get_features(state)
@@ -90,7 +90,6 @@ def train_agent(bp, trial_dir, rank, trial_num, is_transfer=False):
             reward = calculate_custom_reward(
                 next_state,
                 action_val,
-                bp['w_energy'],
                 bp['w_position'],
                 bp.get("w_balance", bp["w_stab"]),
                 bp["w_stab"],
@@ -112,7 +111,7 @@ def train_agent(bp, trial_dir, rank, trial_num, is_transfer=False):
         pbar.update(1)
         pbar.set_postfix_str(f"Rwd={total_reward:6.0f}, Eps={agent.epsilon:.2f}")
         
-        if ep % 25 == 0 or ep == EPISODES_PER_MODEL - 1:
+        if ep % 25 == 0 or ep == episodes_per_model - 1:
             # --- SAVE CHECKPOINT ---
             np.savez(checkpoint_file, ep=ep, weights=agent.weights, 
                      epsilon=agent.epsilon, reward_history=np.array(reward_history))
@@ -279,7 +278,7 @@ def generate_animation(trial_dir):
 
 
 def process_model(args):
-    rank, trial_number, trial_value, trial_params, results_root, is_transfer = args
+    rank, trial_number, trial_value, trial_params, results_root, is_transfer, episodes_per_model = args
     trial_dir = results_root / f"{rank}_trial_{trial_number:03d}"
     trial_dir.mkdir(exist_ok=True)
     
@@ -290,7 +289,7 @@ def process_model(args):
     with open(trial_dir / 'config.json', 'w') as f:
         json.dump(config_data, f, indent=4)
 
-    agent = train_agent(trial_params, trial_dir, rank, trial_number, is_transfer=is_transfer)
+    agent = train_agent(trial_params, trial_dir, rank, trial_number, is_transfer=is_transfer, episodes_per_model=episodes_per_model)
     evaluate_safely(agent, trial_params, trial_dir)
     generate_animation(trial_dir)
 
@@ -310,7 +309,7 @@ if __name__ == "__main__":
             optuna.storages.journal.JournalFileBackend(str(journal_path))
         )
         study = optuna.load_study(
-            study_name="rbf_swingup_balance_robust",
+            study_name="rbf_log_reward_robust",
             storage=storage,
         )
     except Exception as e:
@@ -367,7 +366,7 @@ if __name__ == "__main__":
     # Prepare arguments for multiprocessing
     args_list = []
     for rank, trial in enumerate(top_5_trials, start=1):
-        args_list.append((rank, trial.number, trial.value, trial.params, results_root, args.transfer))
+        args_list.append((rank, trial.number, trial.value, trial.params, results_root, args.transfer, EPISODES_PER_MODEL))
 
     # Launch 5 workers
     print(f"Launching {TOTAL_MODELS} parallel workers...\n")

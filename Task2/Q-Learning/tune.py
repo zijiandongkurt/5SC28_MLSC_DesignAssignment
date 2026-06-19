@@ -159,7 +159,6 @@ def objective(trial):
     alpha = trial.suggest_float('alpha', 0.010, 0.040, log=True)
     gamma = trial.suggest_float('gamma', 0.95, 0.999)
     eps_decay = trial.suggest_float('epsilon_decay', 0.98, 0.999)
-    w_energy = trial.suggest_float('w_energy', 0.1, 2.0)
     w_position = trial.suggest_float('w_position', 1.0, 5.0)
     w_balance = trial.suggest_float('w_balance', 0.0, 4.0)
     w_stab = trial.suggest_float('w_stab', 0.0, 3.0)
@@ -186,7 +185,7 @@ def objective(trial):
             next_state, _, terminated, truncated, _ = env.step(action_val)
             done = terminated or truncated
             
-            reward = calculate_custom_reward(next_state, action_val, w_energy, w_position, w_balance, w_stab)
+            reward = calculate_custom_reward(next_state, action_val, w_position, w_balance, w_stab)
             
             next_features = feature_extractor.get_features(next_state)
             
@@ -219,7 +218,7 @@ def run_worker(n_trials):
         optuna.storages.journal.JournalFileBackend(journal_path)
     )
     study = optuna.load_study(
-        study_name="rbf_swingup_balance_robust",
+        study_name="rbf_log_reward_robust",
         storage=storage,
         pruner=optuna.pruners.MedianPruner()
     )
@@ -236,7 +235,7 @@ if __name__ == "__main__":
     
     study = optuna.create_study(
         direction="maximize", 
-        study_name="rbf_swingup_balance_robust",
+        study_name="rbf_log_reward_robust",
         storage=storage,
         load_if_exists=True,
         pruner=optuna.pruners.MedianPruner()
