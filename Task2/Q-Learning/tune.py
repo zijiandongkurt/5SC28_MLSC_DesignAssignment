@@ -18,6 +18,7 @@ from datetime import datetime, timedelta
 import numpy as np
 
 from agent import RBFFeatureExtractor, RBFQLearningAgent
+from wrappers import AdaptiveBiasWrapper
 from reward import calculate_custom_reward
 
 START_TIME = None
@@ -117,6 +118,7 @@ def evaluate_policy(agent, feature_extractor, eval_episodes):
     scores = []
     for variant_index, variant in enumerate(ROBUST_EVAL_VARIANTS):
         env = make_env()
+        env = AdaptiveBiasWrapper(env, alpha=0.05, dt=0.025)
         apply_env_variant(env, variant)
         try:
             for episode in range(eval_episodes):
@@ -164,6 +166,7 @@ def objective(trial):
 
     # 2. Setup Environment and Agent
     env = make_env()
+    env = AdaptiveBiasWrapper(env, alpha=0.05, dt=0.025)
     rng = np.random.default_rng(SEED + trial.number)
     feature_extractor = RBFFeatureExtractor(n_bins, sigma)
     agent = RBFQLearningAgent(feature_extractor.num_features, ACTIONS, alpha, gamma, 1.0, eps_decay)
@@ -172,7 +175,9 @@ def objective(trial):
     for episode in range(TRAIN_EPISODES):
         randomize_env_for_training(env, rng)
         state, _ = env.reset(seed=SEED + episode)
+        
         features = feature_extractor.get_features(state)
+        
         done = False
         episode_reward = 0
 
@@ -182,6 +187,7 @@ def objective(trial):
             done = terminated or truncated
             
             reward = calculate_custom_reward(next_state, action_val, w_energy, w_position, w_balance, w_stab)
+            
             next_features = feature_extractor.get_features(next_state)
             
             agent.update(features, action_idx, reward, next_features, done)

@@ -1,0 +1,19 @@
+{
+  "environment": "real",
+  "model": "Task2\\actor_critic\\actor_critic_policy.pt",
+  "mode": "policy",
+  "constant_u": 0.0,
+  "steps_requested": 50,
+  "steps_completed": 50,
+  "stop_reason": "completed",
+  "render": false,
+  "sleep": 0.025,
+  "voltage_limit": 0.3,
+  "rate_limit": 0.02,
+  "omega_limit": 10.0,
+  "theta_abs_limit": 1000000.0,
+  "theta_offset": 0.0,
+  "omega_bias": 0.0,
+  "omega_sign": 1.0,
+  "action_sign": 1.0
+}

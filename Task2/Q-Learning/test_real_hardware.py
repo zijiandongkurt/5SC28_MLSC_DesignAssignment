@@ -38,9 +38,12 @@ def latest_sweep_batch():
     return sweep_root / f"v{versions[-1]}"
 
 def default_models_root():
-    sweep_batch = latest_sweep_batch()
-    if sweep_batch is not None:
-        return sweep_batch
+    # Prioritize the most recent top5_results
+    base_root = CURRENT_DIR / "top5_results"
+    if base_root.exists():
+        versions = sorted([int(p.name[1:]) for p in base_root.glob("v*") if p.is_dir() and p.name[1:].isdigit()])
+        if versions: return base_root / f"v{versions[-1]}"
+        
     return CURRENT_DIR / "top5_results"
 
 def has_loadable_model(model_dir):
@@ -107,7 +110,7 @@ def load_model(trial_dir):
         config = json.load(f)
         
     bp = config['params']
-    feature_extractor = RBFFeatureExtractor(bp['n_bins'], bp['sigma'])
+    feature_extractor = RBFFeatureExtractor(bp.get('n_bins', 10), bp['sigma'])
     agent = RBFQLearningAgent(feature_extractor.num_features, ACTIONS, bp['alpha'], bp['gamma'], 0.0, 1.0)
     
     agent.weights = np.load(trial_dir / 'best_rbf_weights.npy')
@@ -269,6 +272,11 @@ def main():
             pass
         env.close()
         print("\nHardware disconnected. Deployment suite closed.")
+        
+        # Automatically generate plots
+        import subprocess
+        print("\n[!] Automatically generating hardware evaluation plots...")
+        subprocess.run([sys.executable, str(CURRENT_DIR / "plot_hardware.py")])
 
 if __name__ == "__main__":
     main()

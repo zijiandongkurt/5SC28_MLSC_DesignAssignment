@@ -52,7 +52,7 @@ class RBFQLearningAgent:
             target_q = reward + self.gamma * np.max(self.get_q_values(next_features))
             
         td_error = target_q - current_q
-        td_error = np.clip(td_error, -50.0, 50.0)
+        td_error = np.clip(td_error, -300.0, 300.0)
         self.weights[action_idx] += self.alpha * td_error * features
 
     def decay_epsilon(self):

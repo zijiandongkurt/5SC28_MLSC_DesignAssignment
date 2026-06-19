@@ -4,10 +4,18 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 CURRENT_DIR = Path(__file__).resolve().parent
-results_dir = CURRENT_DIR / "top5_results"
+
+def get_latest_models_root():
+    base_root = CURRENT_DIR / "top5_results"
+    if base_root.exists():
+        versions = sorted([int(p.name[1:]) for p in base_root.glob("v*") if p.is_dir() and p.name[1:].isdigit()])
+        if versions: return base_root / f"v{versions[-1]}"
+    return CURRENT_DIR / "top5_results"
+
+results_dir = get_latest_models_root()
 
 if not results_dir.exists():
-    print("Could not find top5_results directory.")
+    print(f"Could not find {results_dir} directory.")
     exit()
 
 print("Scanning for hardware telemetry...")
@@ -17,6 +25,13 @@ for model_dir in sorted(results_dir.iterdir()):
     if not model_dir.is_dir(): continue
     
     for npy_file in model_dir.glob("hardware_eval_*.npy"):
+        save_name = npy_file.stem + "_wrapped.png"
+        save_path = model_dir / save_name
+        
+        # Skip if already plotted
+        if save_path.exists():
+            continue
+            
         found_files = True
         print(f"Plotting Wrapped: {model_dir.name} -> {npy_file.name}")
         

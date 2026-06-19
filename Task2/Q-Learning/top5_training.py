@@ -3,7 +3,10 @@ import sys
 import time
 import json
 import datetime
+import multiprocessing
+import argparse
 from pathlib import Path
+from tqdm import tqdm
 
 # Force Matplotlib to run in the background (headless)
 import matplotlib
@@ -24,40 +27,37 @@ sys.path.append(str(CURRENT_DIR))
 # Import your custom modules
 import gym_unbalanced_disk
 from agent import RBFFeatureExtractor, RBFQLearningAgent
+from wrappers import AdaptiveBiasWrapper, StateRandomizationWrapper
+from evaluate_robustness import HardwareImpairmentWrapper
 from reward import calculate_custom_reward
 
 # --- PIPELINE CONFIGURATION ---
 TOTAL_MODELS = 5
-EPISODES_PER_MODEL = 800
-TOTAL_EPISODES = TOTAL_MODELS * EPISODES_PER_MODEL
+EPISODES_PER_MODEL = 1200
 ACTIONS = [-3.0, -2.0, -1.0, -0.5, -0.2, -0.1, -0.05, 0.0, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 3.0]
 SEED = 42
 
-def print_eta(session_eps, global_eps, start_time, rank, trial_num, ep, reward):
-    """Calculates a rock-solid ETA using session time vs global progress."""
-    if session_eps == 0:
-        return
-    
-    elapsed_seconds = time.time() - start_time
-    avg_sec_per_ep = elapsed_seconds / session_eps
-    remaining_eps = TOTAL_EPISODES - global_eps
-    eta_seconds = remaining_eps * avg_sec_per_ep
-    
-    finish_time = datetime.datetime.now() + datetime.timedelta(seconds=eta_seconds)
-    eta_str = str(datetime.timedelta(seconds=int(eta_seconds)))
-    
-    print(f"[Model {rank}/5 | Trial {trial_num}] Ep {ep}/{EPISODES_PER_MODEL} | "
-          f"Reward: {reward:7.2f} | Session Avg: {avg_sec_per_ep:.3f}s/ep | "
-          f"ETA: {eta_str} | Finishes: {finish_time.strftime('%H:%M:%S')}")
-
-
-def train_agent(bp, trial_dir, rank, trial_num, start_time, global_eps, session_eps):
+def train_agent(bp, trial_dir, rank, trial_num, is_transfer=False):
     """Trains the RBF agent with intra-episode checkpointing."""
     env = gym.make('unbalanced-disk-sincos-v0')
-    feature_extractor = RBFFeatureExtractor(bp['n_bins'], bp['sigma'])
+    env = StateRandomizationWrapper(env, death_spiral_prob=0.2)
+    if is_transfer:
+        env = HardwareImpairmentWrapper(env, delay_steps=2, stiction_v=0.1, bias_omega=0.965)
+    env = AdaptiveBiasWrapper(env, alpha=0.05, dt=0.025)
+    feature_extractor = RBFFeatureExtractor(10, bp['sigma'])
     
+    epsilon_start = 0.2 if is_transfer else 1.0
     agent = RBFQLearningAgent(feature_extractor.num_features, ACTIONS, 
-                              bp['alpha'], bp['gamma'], 1.0, bp['epsilon_decay'])
+                              bp['alpha'], bp['gamma'], epsilon_start, bp['epsilon_decay'])
+
+    # --- TRANSFER LEARNING INITIALIZATION ---
+    if is_transfer:
+        source_dir = CURRENT_DIR / "top5_results" / "v2" / f"{rank}_trial_{trial_num:03d}"
+        source_weights_file = source_dir / 'best_rbf_weights.npy'
+        if source_weights_file.exists():
+            agent.weights = np.load(source_weights_file)
+        else:
+            print(f"Warning: Could not find source weights for trial {trial_num} in v2. Starting from scratch.")
 
     checkpoint_file = trial_dir / 'checkpoint.npz'
     start_ep = 0
@@ -65,20 +65,20 @@ def train_agent(bp, trial_dir, rank, trial_num, start_time, global_eps, session_
 
     # --- RESUME FROM CHECKPOINT LOGIC ---
     if checkpoint_file.exists():
-        print(f"\n[!] RECOVERY: Found checkpoint. Resuming training...")
-        data = np.load(checkpoint_file, allow_pickle=True)
-        start_ep = data['ep'].item() + 1
-        agent.weights = data['weights']
-        agent.epsilon = data['epsilon'].item()
-        reward_history = data['reward_history'].tolist()
-        
-        # Advance the global tracker by the amount we skipped
-        global_eps += start_ep
-        print(f"[!] Restored Trial {trial_num} to Episode {start_ep} (Epsilon: {agent.epsilon:.3f})")
+        with np.load(checkpoint_file, allow_pickle=True) as data:
+            start_ep = data['ep'].item() + 1
+            agent.weights = data['weights']
+            agent.epsilon = data['epsilon'].item()
+            reward_history = data['reward_history'].tolist()
+
+    pbar = tqdm(total=EPISODES_PER_MODEL, initial=start_ep, position=rank-1, 
+                desc=f"Rank {rank} (Trial {trial_num:03d})", leave=True, ncols=110, bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] {postfix}")
 
     for ep in range(start_ep, EPISODES_PER_MODEL):
         state, _ = env.reset(seed=SEED if ep == 0 else None)
+        
         features = feature_extractor.get_features(state)
+        
         done = False
         total_reward = 0
 
@@ -95,6 +95,12 @@ def train_agent(bp, trial_dir, rank, trial_num, start_time, global_eps, session_
                 bp.get("w_balance", bp["w_stab"]),
                 bp["w_stab"],
             )
+            
+            # --- Early Termination "Death Penalty" ---
+            if abs(next_state[2]) > 40.0:
+                done = True
+                reward = -500.0
+            
             next_features = feature_extractor.get_features(next_state)
             
             agent.update(features, action_idx, reward, next_features, done)
@@ -103,18 +109,22 @@ def train_agent(bp, trial_dir, rank, trial_num, start_time, global_eps, session_
 
         agent.decay_epsilon()
         reward_history.append(total_reward)
-        global_eps += 1
-        session_eps += 1
+        pbar.update(1)
+        pbar.set_postfix_str(f"Rwd={total_reward:6.0f}, Eps={agent.epsilon:.2f}")
         
         if ep % 25 == 0 or ep == EPISODES_PER_MODEL - 1:
             # --- SAVE CHECKPOINT ---
             np.savez(checkpoint_file, ep=ep, weights=agent.weights, 
                      epsilon=agent.epsilon, reward_history=np.array(reward_history))
-            print_eta(session_eps, global_eps, start_time, rank, trial_num, ep, total_reward)
+
+    pbar.close()
 
     # Clean up checkpoint since we finished successfully
     if checkpoint_file.exists():
-        checkpoint_file.unlink()
+        try:
+            checkpoint_file.unlink()
+        except PermissionError:
+            pass
 
     # Save Final Weights
     np.save(trial_dir / 'best_rbf_weights.npy', agent.weights)
@@ -136,13 +146,14 @@ def train_agent(bp, trial_dir, rank, trial_num, start_time, global_eps, session_
     plt.savefig(trial_dir / 'learning_curve.png')
     plt.close()
 
-    return agent, global_eps, session_eps
+    return agent
 
 
 def evaluate_safely(agent, bp, trial_dir):
     """Runs a 7.5s evaluation with hardware-safe kinematic kill-switches."""
     env = gym.make('unbalanced-disk-sincos-v0')
-    feature_extractor = RBFFeatureExtractor(bp['n_bins'], bp['sigma'])
+    env = AdaptiveBiasWrapper(env, alpha=0.05, dt=0.025)
+    feature_extractor = RBFFeatureExtractor(10, bp['sigma'])
     
     state, _ = env.reset(seed=SEED)
     features = feature_extractor.get_features(state)
@@ -213,7 +224,6 @@ def generate_animation(trial_dir):
         thetas = np.array(data['thetas'])
         voltages = np.array(data['voltages'])
     except Exception:
-        print(f"Skipping animation for {trial_dir.name} due to missing data.")
         return
 
     if len(thetas) == 0:
@@ -268,61 +278,107 @@ def generate_animation(trial_dir):
     plt.close(fig)
 
 
+def process_model(args):
+    rank, trial_number, trial_value, trial_params, results_root, is_transfer = args
+    trial_dir = results_root / f"{rank}_trial_{trial_number:03d}"
+    trial_dir.mkdir(exist_ok=True)
+    
+    if (trial_dir / 'swingup_policy.gif').exists() and (trial_dir / 'best_rbf_weights.npy').exists():
+        return # Skip completed
+        
+    config_data = {"trial_number": trial_number, "eval_score": trial_value, "params": trial_params, "is_transfer": is_transfer}
+    with open(trial_dir / 'config.json', 'w') as f:
+        json.dump(config_data, f, indent=4)
+
+    agent = train_agent(trial_params, trial_dir, rank, trial_number, is_transfer=is_transfer)
+    evaluate_safely(agent, trial_params, trial_dir)
+    generate_animation(trial_dir)
+
+
 if __name__ == "__main__":
-    print("Initializing Resumable Top 5 Pipeline...")
+    parser = argparse.ArgumentParser(description='Train Top 5 RBF Models')
+    parser.add_argument('--transfer', action='store_true', help='Use transfer learning from v2 models for fine-tuning')
+    args = parser.parse_args()
+
+    global EPISODES_PER_MODEL
+    EPISODES_PER_MODEL = 600 if args.transfer else 1200
+
+    print(f"Initializing Multiprocessed Resumable Top 5 Pipeline (Transfer Learning: {args.transfer})...\n")
     
     try:
+        journal_path = CURRENT_DIR / 'rbf_tuning_journal.log'
+        storage = optuna.storages.JournalStorage(
+            optuna.storages.journal.JournalFileBackend(str(journal_path))
+        )
         study = optuna.load_study(
             study_name="rbf_swingup_balance_robust",
-            storage=f"sqlite:///{(CURRENT_DIR / 'rbf_tuning.db').as_posix()}",
+            storage=storage,
         )
     except Exception as e:
-        print("Error: Could not load rbf_tuning.db.")
+        print(f"Error: Could not load journal file: {e}")
         sys.exit()
 
     completed_trials = [t for t in study.trials if t.state == optuna.trial.TrialState.COMPLETE]
     completed_trials.sort(key=lambda t: t.value, reverse=True) 
     top_5_trials = completed_trials[:TOTAL_MODELS]
 
-    results_root = CURRENT_DIR / "top5_results"
+    base_results_root = CURRENT_DIR / "top5_results"
+    base_results_root.mkdir(exist_ok=True)
+
+    top_trial_numbers = {t.number for t in top_5_trials}
+    # Find highest version
+    existing_versions = [int(d.name[1:]) for d in base_results_root.iterdir() if d.is_dir() and d.name.startswith("v") and d.name[1:].isdigit()]
+    
+    if not existing_versions:
+        version = 1
+    else:
+        latest_version = max(existing_versions)
+        latest_dir = base_results_root / f"v{latest_version}"
+        
+        # Check if latest dir is fully complete for all top trials
+        is_complete = True
+        for trial in top_5_trials:
+            trial_dirs = list(latest_dir.glob(f"*_trial_{trial.number:03d}"))
+            if not trial_dirs:
+                is_complete = False
+                break
+            tdir = trial_dirs[0]
+            if not (tdir / 'best_rbf_weights.npy').exists() or not (tdir / 'swingup_policy.gif').exists():
+                is_complete = False
+                break
+                
+        if is_complete:
+            version = latest_version + 1
+        else:
+            version = latest_version
+
+    results_root = base_results_root / f"v{version}"
+
     results_root.mkdir(exist_ok=True)
+    print(f"[INFO] Saving models to versioned folder: {results_root.relative_to(CURRENT_DIR)}\n")
+
+    print(f"{'='*50}")
+    print(f"TOP {TOTAL_MODELS} TRIALS LOADED:")
+    for rank, trial in enumerate(top_5_trials, start=1):
+        print(f"Rank {rank} | Trial {trial.number:03d} | Score: {trial.value:.4f}")
+    print(f"{'='*50}\n")
 
     session_start_time = time.time()
-    global_episodes_done = 0
-    session_episodes_done = 0
 
+    # Prepare arguments for multiprocessing
+    args_list = []
     for rank, trial in enumerate(top_5_trials, start=1):
-        trial_dir = results_root / f"{rank}_trial_{trial.number:03d}"
-        trial_dir.mkdir(exist_ok=True)
-        
-        # --- MODEL-LEVEL SKIP LOGIC ---
-        if (trial_dir / 'swingup_policy.gif').exists() and (trial_dir / 'best_rbf_weights.npy').exists():
-            print(f"\n[>] Skipping Rank {rank} (Trial {trial.number}) - Already fully completed.")
-            global_episodes_done += EPISODES_PER_MODEL
-            continue
-            
-        print(f"\n{'='*50}")
-        print(f"Starting Rank {rank} Pipeline (Trial {trial.number}) - Score: {trial.value:.2f}")
-        print(f"Directory: {trial_dir.name}")
-        print(f"{'='*50}")
+        args_list.append((rank, trial.number, trial.value, trial.params, results_root, args.transfer))
 
-        config_data = {"trial_number": trial.number, "eval_score": trial.value, "params": trial.params}
-        with open(trial_dir / 'config.json', 'w') as f:
-            json.dump(config_data, f, indent=4)
-
-        agent, global_episodes_done, session_episodes_done = train_agent(
-            trial.params, trial_dir, rank, trial.number, session_start_time, global_episodes_done, session_episodes_done
-        )
-
-        print(f"--> Training Complete. Running Safe Hardware Evaluation...")
-        evaluate_safely(agent, trial.params, trial_dir)
-
-        print(f"--> Data Recorded. Rendering GIF (This may take a minute)...")
-        generate_animation(trial_dir)
-        print(f"--> Output saved to {trial_dir.name}")
+    # Launch 5 workers
+    print(f"Launching {TOTAL_MODELS} parallel workers...\n")
+    with multiprocessing.Pool(processes=TOTAL_MODELS) as pool:
+        pool.map(process_model, args_list)
 
     total_time = time.time() - session_start_time
-    print(f"\n{'='*50}")
+    # Add some newlines so we don't print over the tqdm progress bars
+    print("\n" * (TOTAL_MODELS + 1))
+    print(f"{'='*50}")
     print(f"PIPELINE COMPLETE!")
     print(f"Session Runtime: {datetime.timedelta(seconds=int(total_time))}")
     print(f"{'='*50}")
