@@ -26,16 +26,7 @@ MAX_STEPS = 300 # 7.5 seconds
 OMEGA_KILL_LIMIT = 60.0
 GRACE_PERIOD_SEC = 2.0
 
-def latest_sweep_batch():
-    sweep_root = CURRENT_DIR / "top5_stab_sweep_results"
-    if not sweep_root.exists():
-        return None
-    versions = sorted(
-        [int(path.name[1:]) for path in sweep_root.glob("v*") if path.is_dir() and path.name[1:].isdigit()]
-    )
-    if not versions:
-        return None
-    return sweep_root / f"v{versions[-1]}"
+
 
 def default_models_root():
     # Prioritize the most recent top5_results

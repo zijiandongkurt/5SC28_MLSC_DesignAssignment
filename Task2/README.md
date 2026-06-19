@@ -26,10 +26,9 @@ Task2/
     actor_critic_eval.png
   Q-Learning/
     tune.py
-    train_conservative_25.py
+
     test_real_hardware.py
     top5_results/
-    top5_stab_sweep_results/
 ```
 
 ## Your Method
@@ -41,8 +40,8 @@ Your implemented method is actor-critic, specifically a DDPG-style actor-critic:
 
 This satisfies the assignment's actor-critic/model-internalization requirement.
 
-The `Q-Learning/` folder contains the RBF Q-learning experiments, Optuna tuning,
-conservative retraining sweep, and hardware-test tooling.
+The `Q-Learning/` folder contains the RBF Q-learning setup, Optuna tuning,
+hardware filter experiments, and hardware-test tooling.
 
 ## Recommended Run Commands
 

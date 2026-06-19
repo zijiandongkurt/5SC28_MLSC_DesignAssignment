@@ -90,6 +90,7 @@ def train_agent(bp, trial_dir, rank, trial_num, is_transfer=False, episodes_per_
             reward = calculate_custom_reward(
                 next_state,
                 action_val,
+                bp['w_energy'],
                 bp['w_position'],
                 bp.get("w_balance", bp["w_stab"]),
                 bp["w_stab"],
@@ -304,12 +305,12 @@ if __name__ == "__main__":
     print(f"Initializing Multiprocessed Resumable Top 5 Pipeline (Transfer Learning: {args.transfer})...\n")
     
     try:
-        journal_path = CURRENT_DIR / 'rbf_tuning_journal.log'
+        journal_path = CURRENT_DIR / 'models' / 'rbf_tuning_journal.log'
         storage = optuna.storages.JournalStorage(
             optuna.storages.journal.JournalFileBackend(str(journal_path))
         )
         study = optuna.load_study(
-            study_name="rbf_log_reward_robust",
+            study_name="rbf_swingup_balance_robust",
             storage=storage,
         )
     except Exception as e:

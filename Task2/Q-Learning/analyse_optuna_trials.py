@@ -4,20 +4,22 @@ import pandas as pd
 import numpy as np
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, 'rbf_tuning.db').replace(os.sep, '/')
-
+JOURNAL_PATH = os.path.join(BASE_DIR, 'models', 'rbf_tuning_journal.log')
 # We only care about these 5 simulation parameters
 TARGET_PARAMS = ['n_bins', 'sigma', 'alpha', 'gamma', 'epsilon_decay']
 
 def main():
-    if not os.path.exists(os.path.join(BASE_DIR, 'rbf_tuning.db')):
-        print("Database not found!")
+    if not os.path.exists(JOURNAL_PATH):
+        print("Journal log not found!")
         return
 
     print("Loading study...")
+    storage = optuna.storages.JournalStorage(
+        optuna.storages.journal.JournalFileBackend(JOURNAL_PATH)
+    )
     study = optuna.load_study(
-        study_name="rbf_swingup",
-        storage=f"sqlite:///{DB_PATH}",
+        study_name="rbf_swingup_balance_robust",
+        storage=storage,
     )
 
     print(f"Total trials found: {len(study.trials)}")

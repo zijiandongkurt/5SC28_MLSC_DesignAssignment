@@ -17,12 +17,17 @@ np.random.seed(SEED)
 
 if __name__ == "__main__":
     try:
+        journal_path = os.path.join(BASE_DIR, 'models', 'rbf_tuning_journal.log')
+        storage = optuna.storages.JournalStorage(
+            optuna.storages.journal.JournalFileBackend(journal_path)
+        )
         study = optuna.load_study(
             study_name="rbf_swingup_balance_robust",
-            storage=f"sqlite:///{os.path.join(BASE_DIR, 'rbf_tuning.db').replace(os.sep, '/')}",
+            storage=storage,
         )
         bp = study.best_params
     except Exception as e:
+        print(f"Exception: {e}")
         print("Could not load database. Run tune.py first!")
         sys.exit()
     
@@ -33,7 +38,7 @@ if __name__ == "__main__":
     agent = RBFQLearningAgent(feature_extractor.num_features, actions, bp['alpha'], bp['gamma'], 0.0, 1.0)
     
     try:
-        agent.weights = np.load(os.path.join(BASE_DIR, 'best_rbf_weights.npy'))
+        agent.weights = np.load(os.path.join(BASE_DIR, 'models', 'best_rbf_weights.npy'))
         print("Loaded trained weights.")
     except Exception as e:
         print("Could not find weights. Run train_final.py first!")
@@ -70,7 +75,8 @@ if __name__ == "__main__":
     'omegas': omegas,
     'voltages': voltages
     }
-    np.save(os.path.join(BASE_DIR, 'last_eval_data.npy'), data)
+    os.makedirs(os.path.join(BASE_DIR, 'data'), exist_ok=True)
+    np.save(os.path.join(BASE_DIR, 'data', 'last_eval_data.npy'), data)
 
     env.close()
 
@@ -96,5 +102,8 @@ if __name__ == "__main__":
     ax2.grid()
 
     plt.tight_layout()
-    plt.savefig(os.path.join(BASE_DIR, 'evaluation_trajectory.png'))
-    plt.show()
+    os.makedirs(os.path.join(BASE_DIR, 'visualizations'), exist_ok=True)
+    save_path = os.path.join(BASE_DIR, 'visualizations', 'evaluation_trajectory.png')
+    plt.savefig(save_path)
+    plt.close()
+    print(f"Plot saved to: file:///{save_path.replace(os.sep, '/')}")

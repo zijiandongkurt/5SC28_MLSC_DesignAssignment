@@ -20,11 +20,11 @@ if __name__ == "__main__":
     
     # 1. Load the pre-recorded data
     try:
-        data = np.load(CURRENT_DIR / 'last_eval_data.npy', allow_pickle=True).item()
+        data = np.load(CURRENT_DIR / 'data' / 'last_eval_data.npy', allow_pickle=True).item()
         all_thetas = data['thetas']
         all_voltages = data['voltages']
     except FileNotFoundError:
-        print("Error: 'last_eval_data.npy' not found. Please run evaluate.py first to generate the data.")
+        print("Error: 'data/last_eval_data.npy' not found. Please run evaluate.py first to generate the data.")
         sys.exit()
 
     # 2. Reconstruct the precise time array using np.arange (Bug Fixed)

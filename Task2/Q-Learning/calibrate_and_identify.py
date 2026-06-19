@@ -175,7 +175,8 @@ def main():
         
     # --- SAVE DATA ---
     print("\nSaving data and plots...")
-    np.save(CURRENT_DIR / "sys_id_data.npy", data_dict)
+    (CURRENT_DIR / "data").mkdir(exist_ok=True)
+    np.save(CURRENT_DIR / "data" / "sys_id_data.npy", data_dict)
     
     fig, axs = plt.subplots(3, 1, figsize=(10, 12))
     
@@ -214,10 +215,11 @@ def main():
         axs[2].grid(True)
         
     plt.tight_layout()
-    plt.savefig(CURRENT_DIR / "system_identification_results.png")
+    (CURRENT_DIR / "visualizations").mkdir(exist_ok=True)
+    plt.savefig(CURRENT_DIR / "visualizations" / "system_identification_results.png")
     plt.close()
     
-    print(f"\nSUCCESS! Results saved to {CURRENT_DIR / 'system_identification_results.png'}")
+    print(f"\nSUCCESS! Results saved to {CURRENT_DIR / 'visualizations' / 'system_identification_results.png'}")
 
 if __name__ == "__main__":
     main()

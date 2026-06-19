@@ -15,9 +15,13 @@ from reward import calculate_custom_reward
 
 if __name__ == "__main__":
     try:
+        journal_path = os.path.join(BASE_DIR, 'models', 'rbf_tuning_journal.log')
+        storage = optuna.storages.JournalStorage(
+            optuna.storages.journal.JournalFileBackend(journal_path)
+        )
         study = optuna.load_study(
             study_name="rbf_swingup_balance_robust",
-            storage=f"sqlite:///{os.path.join(BASE_DIR, 'rbf_tuning.db').replace(os.sep, '/')}",
+            storage=storage,
         )
         bp = study.best_params
         print("Loaded best parameters from database:", bp)
@@ -65,8 +69,9 @@ if __name__ == "__main__":
         if ep % 25 == 0:
             print(f"Episode {ep}/{episodes} | Reward: {total_reward:.2f}")
 
-    np.save(os.path.join(BASE_DIR, 'best_rbf_weights.npy'), agent.weights)
-    print("Saved weights to 'best_rbf_weights.npy'")
+    os.makedirs(os.path.join(BASE_DIR, 'models'), exist_ok=True)
+    np.save(os.path.join(BASE_DIR, 'models', 'best_rbf_weights.npy'), agent.weights)
+    print("Saved weights to 'models/best_rbf_weights.npy'")
     env.close()
 
     plt.figure(figsize=(10, 5))
@@ -83,5 +88,8 @@ if __name__ == "__main__":
     plt.legend()
     plt.grid()
     plt.tight_layout()
-    plt.savefig(os.path.join(BASE_DIR, 'learning_curve.png'))
-    plt.show()
+    os.makedirs(os.path.join(BASE_DIR, 'visualizations'), exist_ok=True)
+    save_path = os.path.join(BASE_DIR, 'visualizations', 'learning_curve.png')
+    plt.savefig(save_path)
+    plt.close()
+    print(f"Plot saved to: file:///{save_path.replace(os.sep, '/')}")

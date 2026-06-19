@@ -108,14 +108,14 @@ def main():
         
         # Load real hardware impairments
         try:
-            sys_id = np.load(CURRENT_DIR / 'sys_id_data.npy', allow_pickle=True).item()
+            sys_id = np.load(CURRENT_DIR / 'data' / 'sys_id_data.npy', allow_pickle=True).item()
             delay_steps = sys_id.get('delay_steps', 2)
             stiction_v = sys_id.get('stiction_voltage', 0.1)
             theta_offset = sys_id.get('theta_offset', 0.0)
             omega_bias = sys_id.get('omega_bias', 0.96)
             omega_noise = np.sqrt(sys_id.get('omega_variance', 0.4)) * 3 # 3-sigma
         except:
-            print("Could not load sys_id_data.npy. Using defaults.")
+            print("Could not load data/sys_id_data.npy. Using defaults.")
             delay_steps, stiction_v, theta_offset, omega_bias, omega_noise = 2, 0.1, 0.0, 0.96, 1.88
 
         # 1. Inject impairments

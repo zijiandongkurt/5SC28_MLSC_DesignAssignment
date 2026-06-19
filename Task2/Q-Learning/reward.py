@@ -1,21 +1,23 @@
-import numpy as np
-
-def calculate_custom_reward(state, action, w_position, w_balance, w_stab=None):
+def calculate_custom_reward(state, action, w_energy, w_position, w_balance, w_stab=None):
     if w_stab is None:
         w_stab = w_balance
 
     sin_th, cos_th, omega = state
     
-    # --- Logarithmic Position Reward ---
-    # Give 0 reward for the entire bottom half (cos_th >= 0)
-    # Exponentially reward balancing in the top half (cos_th < 0)
-    if cos_th >= 0:
-        position_reward = 0.0
-    else:
-        # distance_to_top is 1.0 at horizontal, and 0.0 at perfectly vertical
-        distance_to_top = (1.0 + cos_th) 
-        # Peaks at 2.0 when perfectly balanced
-        position_reward = -np.log10(distance_to_top + 0.01)
+    position_reward = -cos_th 
+    
+    E_kin = 0.5 * (omega ** 2)
+    E_pot = position_reward * 100.0 
+    E_current = E_kin + E_pot
+    
+    E_target = 100.0 
+    energy_penalty = -abs(E_current - E_target) / 100.0 
+    
+    # --- Strict Speed Limit for "Unnecessary Kinetic Energy" ---
+    # We allow a 10% margin above E_target (110.0) before aggressively penalizing
+    E_excess = max(0.0, E_current - 110.0)
+    excess_penalty = -(E_excess ** 2) / 1000.0
+    energy_penalty += excess_penalty 
     
     if cos_th < -0.8: 
         balance_bonus = w_position * (1.0 - min(1.0, abs(omega) / 6.0))
@@ -24,4 +26,4 @@ def calculate_custom_reward(state, action, w_position, w_balance, w_stab=None):
         balance_bonus = 0.0
         stab_penalty = 0.0
 
-    return (w_position * position_reward) + (w_balance * balance_bonus) - (w_stab * stab_penalty)
+    return (w_position * position_reward) + (w_energy * energy_penalty) + (w_balance * balance_bonus) - (w_stab * stab_penalty)
