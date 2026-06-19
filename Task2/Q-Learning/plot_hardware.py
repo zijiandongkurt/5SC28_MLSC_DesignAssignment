@@ -5,35 +5,26 @@ import matplotlib.pyplot as plt
 
 CURRENT_DIR = Path(__file__).resolve().parent
 
-def get_latest_models_root():
-    base_root = CURRENT_DIR / "top5_results"
-    if base_root.exists():
-        versions = sorted([int(p.name[1:]) for p in base_root.glob("v*") if p.is_dir() and p.name[1:].isdigit()])
-        if versions: return base_root / f"v{versions[-1]}"
-    return CURRENT_DIR / "top5_results"
+HW_TESTS_DIR = CURRENT_DIR / "hardware_tests"
+HW_NPY_DIR = HW_TESTS_DIR / "npy"
+HW_PNG_DIR = HW_TESTS_DIR / "png"
 
-results_dir = get_latest_models_root()
-
-if not results_dir.exists():
-    print(f"Could not find {results_dir} directory.")
-    exit()
+HW_NPY_DIR.mkdir(parents=True, exist_ok=True)
+HW_PNG_DIR.mkdir(parents=True, exist_ok=True)
 
 print("Scanning for hardware telemetry...")
 found_files = False
 
-for model_dir in sorted(results_dir.iterdir()):
-    if not model_dir.is_dir(): continue
+for npy_file in sorted(HW_NPY_DIR.glob("*.npy")):
+    save_name = npy_file.stem + "_wrapped.png"
+    save_path = HW_PNG_DIR / save_name
     
-    for npy_file in model_dir.glob("hardware_eval_*.npy"):
-        save_name = npy_file.stem + "_wrapped.png"
-        save_path = model_dir / save_name
+    # Skip if already plotted
+    if save_path.exists():
+        continue
         
-        # Skip if already plotted
-        if save_path.exists():
-            continue
-            
-        found_files = True
-        print(f"Plotting Wrapped: {model_dir.name} -> {npy_file.name}")
+    found_files = True
+    print(f"Plotting Wrapped: {npy_file.name}")
         
         data = np.load(npy_file, allow_pickle=True).item()
         
@@ -85,7 +76,7 @@ for model_dir in sorted(results_dir.iterdir()):
         labels = [l.get_label() for l in lines]
         ax1.legend(lines, labels, loc='upper left')
         
-        ax1.set_title(f'Wrapped Physical Trajectory: {model_dir.name} ({npy_file.stem})\nStatus: {stop_reason}')
+        ax1.set_title(f'Wrapped Physical Trajectory: {npy_file.stem}\nStatus: {stop_reason}')
         ax1.grid(True, alpha=0.3)
         
         # 3. Plot Voltages
@@ -102,7 +93,7 @@ for model_dir in sorted(results_dir.iterdir()):
         
         # Save the plot
         save_name = npy_file.stem + "_wrapped.png"
-        plt.savefig(model_dir / save_name)
+        plt.savefig(HW_PNG_DIR / save_name)
         plt.close()
 
 if not found_files:

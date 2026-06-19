@@ -42,21 +42,26 @@ def has_loadable_model(model_dir):
 
 def get_safe_filename(trial_dir, partial=False):
     """Ensures zero-overwrites by finding the next sequential _vX file."""
-    base_name = "hardware_eval_v"
-    existing_files = glob.glob(str(trial_dir / f"{base_name}*"))
+    hw_dir = CURRENT_DIR / "hardware_tests" / "npy"
+    hw_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Use parent name (e.g. v4) and trial name (e.g. 1_trial_133)
+    prefix = f"{trial_dir.parent.name}_{trial_dir.name}_hardware_eval_v"
+    
+    existing_files = glob.glob(str(hw_dir / f"{prefix}*"))
     
     # Extract version numbers safely
     versions = []
     for f in existing_files:
         try:
-            v_str = f.split(base_name)[1].split('_')[0].split('.npy')[0]
+            v_str = os.path.basename(f).split(prefix)[1].split('_')[0].split('.npy')[0]
             versions.append(int(v_str))
         except:
             pass
             
     next_v = max(versions) + 1 if versions else 1
     suffix = "_partial" if partial else ""
-    return trial_dir / f"{base_name}{next_v}{suffix}.npy"
+    return hw_dir / f"{prefix}{next_v}{suffix}.npy"
 
 def high_res_countdown(seconds):
     """A live, 4-decimal precision countdown that overwrites the terminal line."""
