@@ -1,0 +1,58 @@
+[
+  {
+    "na": 2,
+    "nb": 2,
+    "num_inducing": 200,
+    "pred_rms_rad": 0.004177583450713478,
+    "pred_rms_deg": 0.23935790028958107
+  },
+  {
+    "na": 2,
+    "nb": 2,
+    "num_inducing": 500,
+    "pred_rms_rad": 0.004189843532597805,
+    "pred_rms_deg": 0.2400603512380378
+  },
+  {
+    "na": 3,
+    "nb": 3,
+    "num_inducing": 200,
+    "pred_rms_rad": 0.0035602241558461856,
+    "pred_rms_deg": 0.20398581825051268
+  },
+  {
+    "na": 3,
+    "nb": 3,
+    "num_inducing": 500,
+    "pred_rms_rad": 0.0036286920912780825,
+    "pred_rms_deg": 0.20790874198273462
+  },
+  {
+    "na": 4,
+    "nb": 4,
+    "num_inducing": 200,
+    "pred_rms_rad": 0.0034005319921872608,
+    "pred_rms_deg": 0.1948361312515439
+  },
+  {
+    "na": 4,
+    "nb": 4,
+    "num_inducing": 500,
+    "pred_rms_rad": 0.0033273900034373563,
+    "pred_rms_deg": 0.190645403990981
+  },
+  {
+    "na": 5,
+    "nb": 5,
+    "num_inducing": 200,
+    "pred_rms_rad": 0.003580918732625365,
+    "pred_rms_deg": 0.20517153015876913
+  },
+  {
+    "na": 5,
+    "nb": 5,
+    "num_inducing": 500,
+    "pred_rms_rad": 0.0032675163055582903,
+    "pred_rms_deg": 0.18721489379866912
+  }
+]

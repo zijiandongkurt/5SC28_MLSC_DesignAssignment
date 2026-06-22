@@ -1,0 +1,7 @@
+{
+  "sparse_gp_prediction_test": {
+    "rms_rad": 0.0036449530073880076,
+    "rms_deg": 0.20884042384684962,
+    "nrms_percent": 0.7763550422016768
+  }
+}
