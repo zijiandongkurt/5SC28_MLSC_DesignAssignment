@@ -25,7 +25,9 @@ From the project root:
 
 ```bash
 cd /Users/zijiandong/Documents/GitHub/5SC28_MLSC_DesignAssignment
-python3 task1_outputs/task1_gp_model.py --out-dir Task1/GP
+python3 task1_outputs/task1_gp_prediction_model.py --out-dir Task1/GP
+
+python3 task1_outputs/task1_gp_prediction_model.py --out-dir Task1/GP
 ```
 
 ## Report Description

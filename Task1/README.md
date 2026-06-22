@@ -17,9 +17,16 @@ Task1/
   shared/
     task1_common.py
   GP/
-    task1_gp_model.py
-    task1_gp_metrics.json
-    hidden-test-prediction-sparse-gp-submission-file.npz
+    task1_gp_prediction_model.py
+    task1_gp_simulation_model.py
+    sweep_prediction.py
+    sweep_simulation.py
+    task1_gp_prediction_metrics.json
+    task1_gp_simulation_metrics.json
+    task1_sweep_prediction.json
+    task1_sweep_simulation.json
+    hidden-test-prediction-gp-submission-file.npz
+    hidden-test-simulation-gp-submission-file.npz
   ANN/
     task1_ann_model.py
     task1_ann_metrics.json
